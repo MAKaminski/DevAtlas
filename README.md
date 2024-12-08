@@ -21,4 +21,9 @@ Configuration: Identify configuration files and extract key configuration parame
 Other: Any other content should be categorized and summarized based on relevance.
 Once the content is processed, please categorize it and return the classification alongside any recommendations for improvements or next steps.
 
+After Content is saved - (change content limit to max token content limit - with max stream value of 1 prompt)
+
+feed content
+
 --
+

@@ -26,7 +26,7 @@ class InteractiveNetworkGraphVisualizer:
         query_repos = "SELECT id, name FROM repos"
         query_file_objects = "SELECT id, repo_id, name, url, type FROM fileObjects"
         query_domains = "SELECT id, name FROM domains"
-        query_content = "SELECT id, fileObject_id, domain_id FROM content"
+        query_content = "SELECT id, fileObject_id, domain_id, description FROM content"
         
         # Fetch all data
         self.cursor.execute(query_repos)
@@ -61,8 +61,8 @@ class InteractiveNetworkGraphVisualizer:
             G.add_node(f"domain_{domain_id}", label=domain_name, type="domain")
 
         # Add nodes for content and edges to file objects and domains
-        for content_id, file_id, domain_id in content:
-            G.add_node(f"content_{content_id}", label=f"Content {content_id}", type="content")
+        for content_id, file_id, domain_id, description in content:
+            G.add_node(f"content_{content_id}", label=f"Content {content_id}", type="content", description=description)
             G.add_edge(f"file_{file_id}", f"content_{content_id}")
             G.add_edge(f"domain_{domain_id}", f"content_{content_id}")
 
@@ -74,7 +74,7 @@ class InteractiveNetworkGraphVisualizer:
         node_x = []
         node_y = []
         node_labels = []
-        node_tooltips = []  # Tooltips for the file objects
+        node_tooltips = []  # Tooltips for the nodes
         node_types = []
         
         # Collect node data
@@ -144,7 +144,7 @@ class InteractiveNetworkGraphVisualizer:
                             yaxis=dict(showgrid=False, zeroline=False),
                             plot_bgcolor='black',  # Set background color to black
                             paper_bgcolor='black',  # Set paper background to black
-                            font=dict(color='black')  # Set font color for legend and title
+                            font=dict(color='white')  # Set font color for legend and title
                         ))
         
         fig.show()
@@ -158,7 +158,7 @@ class InteractiveNetworkGraphVisualizer:
         elif data['type'] == 'domain':
             return f"Domain: {data['label']}"
         elif data['type'] == 'content':
-            return f"Content ID: {data['label']}"
+            return f"Content ID: {data['label']}<br>Description: {data.get('description', 'N/A')}"
         else:
             return f"{data['label']}"
 
@@ -171,7 +171,7 @@ class InteractiveNetworkGraphVisualizer:
 # Usage example
 
 if __name__ == "__main__":
-    db_file = "example.db"  # Specify the path to your SQLite DB file
+    db_file = "DevAtlas.db"  # Specify the path to your SQLite DB file
     visualizer = InteractiveNetworkGraphVisualizer(db_file)
     
     # Connect to the database

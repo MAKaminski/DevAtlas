@@ -1,7 +1,9 @@
+## IMPORTS ###########################################################################################################
+from dotenv import load_dotenv
+import random
 import sqlite3
 from sqlite3 import Error
-import random
-
+## CLASSES ###########################################################################################################
 class DatabaseInitializer:
     def __init__(self, db_file):
         """Initialize the Database connection"""
@@ -59,6 +61,16 @@ class DatabaseInitializer:
                 FOREIGN KEY (domain_id) REFERENCES domains (id)
             );
             """
+            ,"""
+            CREATE TABLE content_domain_relationships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content_id INTEGER NOT NULL,
+                domain_id INTEGER NOT NULL,
+                relatedness_percentage INTEGER NOT NULL,
+                FOREIGN KEY (content_id) REFERENCES content (id),
+                FOREIGN KEY (domain_id) REFERENCES domains (id)
+            );
+            """
         ]
         
         try:
@@ -72,20 +84,22 @@ class DatabaseInitializer:
     def load_test_data(self):
         """Load test data into the tables"""
         # Repositories
-        repos_data = [
-            ("Repo1", "GitHub", "https://github.com/repo1"),
-            ("Repo2", "GitHub", "https://github.com/repo2"),
-            ("Repo3", "GitHub", "https://github.com/repo3"),
-            ("Repo4", "GitLab", "https://gitlab.com/repo4"),
-            ("Repo5", "Bitbucket", "https://bitbucket.org/repo5")
-        ]
+        # repos_data = [
+        #     ("Repo1", "GitHub", "https://github.com/repo1"),
+        #     ("Repo2", "GitHub", "https://github.com/repo2"),
+        #     ("Repo3", "GitHub", "https://github.com/repo3"),
+        #     ("Repo4", "GitLab", "https://gitlab.com/repo4"),
+        #     ("Repo5", "Bitbucket", "https://bitbucket.org/repo5")
+        # ]
         
-        # Domains
+        # # Domains
         domains_data = [
-            ("Technology", "Technology-related content"),
-            ("Health", "Health-related content"),
-            ("Science", "Science-related content"),
-            ("Finance", "Finance-related content")
+            ("Technology", " content"),
+            ("API", " content"),
+            ("Product", " content"),
+            ("Finance", " content"),
+            ("Knowledge", " content"),
+            ("Operations", " content")
         ]
         
         # File objects (2-5 per repo)
@@ -107,11 +121,11 @@ class DatabaseInitializer:
                     content_data.append((repo_id, content_description, domain_id))
         
         try:
-            # Insert data into repos
-            self.cursor.executemany("""
-                INSERT INTO repos (name, platform, url)
-                VALUES (?, ?, ?)
-            """, repos_data)
+            # # Insert data into repos
+            # self.cursor.executemany("""
+            #     INSERT INTO repos (name, platform, url)
+            #     VALUES (?, ?, ?)
+            # """, repos_data)
             
             # Insert data into domains
             self.cursor.executemany("""
@@ -119,17 +133,17 @@ class DatabaseInitializer:
                 VALUES (?, ?)
             """, domains_data)
             
-            # Insert data into fileObjects
-            self.cursor.executemany("""
-                INSERT INTO fileObjects (repo_id, type, name, url)
-                VALUES (?, ?, ?, ?)
-            """, file_objects_data)
+            # # Insert data into fileObjects
+            # self.cursor.executemany("""
+            #     INSERT INTO fileObjects (repo_id, type, name, url)
+            #     VALUES (?, ?, ?, ?)
+            # """, file_objects_data)
             
-            # Insert data into content
-            self.cursor.executemany("""
-                INSERT INTO content (fileObject_id, description, domain_id)
-                VALUES (?, ?, ?)
-            """, content_data)
+            # # Insert data into content
+            # self.cursor.executemany("""
+            #     INSERT INTO content (fileObject_id, description, domain_id)
+            #     VALUES (?, ?, ?)
+            # """, content_data)
             
             self.connection.commit()
             print("Test data loaded successfully.")
@@ -159,19 +173,19 @@ class DatabaseInitializer:
 
 if __name__ == "__main__":
     # Initialize the DatabaseInitializer class
-    db_initializer = DatabaseInitializer("example.db")
+    db_initializer = DatabaseInitializer("DevAtlas.db")
 
     # Connect to the database
     connection, cursor = db_initializer.connect()
+
+    # Drop the database and all tables (optional)
+    # db_initializer.drop_db()
 
     # Create tables in the database
     db_initializer.create_tables()
 
     # Load test data into the database
-    db_initializer.load_test_data()
-
-    # Drop the database and all tables (optional)
-    # db_initializer.drop_db()
+    # db_initializer.load_test_data()
 
     # Close the database connection
     db_initializer.close()

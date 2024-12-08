@@ -1,0 +1,35 @@
+name: Repo Domain Knowledge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  analyze_repo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install PyGithub matplotlib networkx
+
+      - name: Run domain knowledge tool
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python domain_knowledge_tool.py
+
+      - name: Upload Graph
+        uses: actions/upload-artifact@v3
+        with:
+          name: domain-knowledge-graph
+          path: domain_knowledge_graph.png

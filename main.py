@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # Load environment variables
     load_dotenv()
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-    REPO_NAME = os.getenv("GITHUB_REPO")
+    REPO = os.getenv("REPO")
     
     # Initialize classes
     analyzer = GitHubRepoAnalyzer(GITHUB_TOKEN, REPO)

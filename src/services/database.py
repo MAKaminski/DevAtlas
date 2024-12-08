@@ -1,8 +1,11 @@
 ## IMPORTS ###########################################################################################################
 from dotenv import load_dotenv
+import os
 import random
 import sqlite3
 from sqlite3 import Error
+load_dotenv()
+DB = os.getenv("DATABASE")
 ## CLASSES ###########################################################################################################
 class DatabaseInitializer:
     def __init__(self, db_file):
@@ -173,7 +176,7 @@ class DatabaseInitializer:
 
 if __name__ == "__main__":
     # Initialize the DatabaseInitializer class
-    db_initializer = DatabaseInitializer("DevAtlas.db")
+    db_initializer = DatabaseInitializer(DB)
 
     # Connect to the database
     connection, cursor = db_initializer.connect()

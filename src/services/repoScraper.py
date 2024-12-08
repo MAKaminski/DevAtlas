@@ -210,14 +210,13 @@ if __name__ == "__main__":
     # Load environment variables
     load_dotenv()
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-    REPOS = os.getenv("REPO")  # Comma-separated list of repositories, e.g., "torvalds/linux,python/cpython"
-
+    REPOS = os.getenv("REPO")
+    DB = os.getenv("DATABASE")
+    
     if not GITHUB_TOKEN or not REPOS:
         raise ValueError("Environment variables GITHUB_TOKEN and REPOS must be set.")
 
-    db_file = "DevAtlas.db"
-
-    scraper = GitHubRepoScraper(db_file, GITHUB_TOKEN)
+    scraper = GitHubRepoScraper(DB, GITHUB_TOKEN)
 
     # Add repositories to scrape
     scraper.repo_list = [repo.strip() for repo in REPOS.split(",")]

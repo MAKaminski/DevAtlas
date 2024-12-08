@@ -1,6 +1,10 @@
 import sqlite3
 import plotly.graph_objects as go
 import networkx as nx
+from dotenv import load_dotenv
+
+load_dotenv()
+DB = os.getenv("DATABASE") 
 
 class InteractiveNetworkGraphVisualizer:
     def __init__(self, db_file):
@@ -171,8 +175,8 @@ class InteractiveNetworkGraphVisualizer:
 # Usage example
 
 if __name__ == "__main__":
-    db_file = "DevAtlas.db"  # Specify the path to your SQLite DB file
-    visualizer = InteractiveNetworkGraphVisualizer(db_file)
+
+    visualizer = InteractiveNetworkGraphVisualizer(DB)
     
     # Connect to the database
     connection, cursor = visualizer.connect()

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+DB = os.getenv("DATABASE")
 client = OpenAI(api_key=os.getenv("OPENAI_KEY"))
 
 class GPTContentAnalyzer:
@@ -120,10 +121,9 @@ class GPTContentAnalyzer:
             self.insert_new_domain(new_domain)
 
 if __name__ == "__main__":
-    DB_FILE = "DevAtlas.db"
 
     # Initialize the analyzer
-    analyzer = GPTContentAnalyzer(DB_FILE)
+    analyzer = GPTContentAnalyzer(DB)
 
     # Connect to the database
     analyzer.connect_db()

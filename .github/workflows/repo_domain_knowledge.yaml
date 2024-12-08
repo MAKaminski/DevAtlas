@@ -26,7 +26,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-        run: python domain_knowledge_tool.py
+        run: python main.py
 
       - name: Upload Graph
         uses: actions/upload-artifact@v3

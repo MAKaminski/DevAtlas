@@ -1,15 +1,21 @@
+## IMPORTS ##############################################################################################################
+import re
 import os
 import sqlite3
+## IMPORT CLASSES ########################################################################################################
 from github import Github
-from gptController import GPTContentAnalyzer
 from github.GithubException import UnknownObjectException
+## DEV_ATLAS CLASSES #####################################################################################################
+from gptController import GPTContentAnalyzer
+## FUNCTIONS ############################################################################################################
 from dotenv import load_dotenv
-import re
-
+## CONFIGURATION ########################################################################################################
 load_dotenv()
 DB = os.getenv("DATABASE")
-
-class GitHubRepoScraper:
+## TESTING ##############################################################################################################
+RUN_STYLE = 'SINGLE' # 'MULTI'
+## CLASSES ############################################################################################################
+class RepoScraper:
     IGNORE_REPOS = ["src/data/", "env/", ".env", ".venv"]  # List of files or directories to ignore
 
     def __init__(self, db_file, github_token):
@@ -65,38 +71,6 @@ class GitHubRepoScraper:
                 return domain_id
         return None
 
-    def recommend_domains_from_db(self):
-        """Recommend domains based on scraped data in the database."""
-        self.connect_db()
-        try:
-            # Fetch all content descriptions and associated domains
-            self.cursor.execute(
-                """
-                SELECT c.description, d.name
-                FROM content c
-                JOIN domains d ON c.domain_id = d.id
-                """
-            )
-            data = self.cursor.fetchall()
-
-            domain_recommendations = {}
-
-            # Analyze content and aggregate domain recommendations
-            for description, domain_name in data:
-                if domain_name not in domain_recommendations:
-                    domain_recommendations[domain_name] = 0
-                domain_recommendations[domain_name] += 1
-
-            # Display recommendations
-            if domain_recommendations:
-                print("Recommended Domains based on scraped data:")
-                for domain, count in sorted(domain_recommendations.items(), key=lambda x: x[1], reverse=True):
-                    print(f"{domain}: {count} mentions")
-            else:
-                print("No domains could be recommended from the scraped data.")
-        finally:
-            self.close_db()
-
     def parse_gitignore(self, repo):
         """Parse the .gitignore file in the repository, if it exists."""
         try:
@@ -110,7 +84,6 @@ class GitHubRepoScraper:
         except Exception as e:
             print(f"Unexpected error while accessing .gitignore in {repo.full_name}: {e}")
             return []
-
 
     def should_ignore(self, path, gitignore_patterns):
         """Check if a file or directory should be ignored based on .gitignore and IGNORE_REPOS."""
@@ -155,7 +128,7 @@ class GitHubRepoScraper:
                     repo_id, "file", content_file.name, content_file.html_url
                 )
 
-                # Fetch file content and insert into database
+                # Fetch file content and analyze it
                 try:
                     file_content = content_file.decoded_content.decode("utf-8", errors="ignore")
                 except Exception as e:
@@ -163,14 +136,11 @@ class GitHubRepoScraper:
                     file_content = ""
 
                 description = file_content[:10000]  # Truncate content to 10,000 characters
-
-                summary, domainRelatedness = GPTContentAnalyzer(DB).analyze_content_with_gpt(description, domains)
-                
-                # Ensure Summary is also inserted, as is domainRelatedness as records to the content
-                # Then RUN!
-                
-                
-                self.insert_content(file_id, description, domain_id)
+                analysis_result = GPTContentAnalyzer(DB).analyze_content_with_gpt(description, domains)
+                if analysis_result:
+                    domain_ids = GPTContentAnalyzer(DB).process_analysis_result(file_id, analysis_result, domains)
+                    for domain_id in domain_ids:
+                        self.insert_content(file_id, description, domain_id)
 
     def print_repo_results(self, repo_full_name):
         """Print the results of the repository scrape."""
@@ -204,25 +174,19 @@ class GitHubRepoScraper:
                     print(f"Error scraping repo {repo_full_name}: {e}")
         finally:
             self.close_db()
-
-# Usage example
+## MAIN ##############################################################################################################
 if __name__ == "__main__":
-    # Load environment variables
+
     load_dotenv()
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-    REPOS = os.getenv("REPO")
+    REPO= os.getenv("MAIN_REPO")
     DB = os.getenv("DATABASE")
     
-    if not GITHUB_TOKEN or not REPOS:
+    if not GITHUB_TOKEN or not REPO:
         raise ValueError("Environment variables GITHUB_TOKEN and REPOS must be set.")
-
-    scraper = GitHubRepoScraper(DB, GITHUB_TOKEN)
-
-    # Add repositories to scrape
-    scraper.repo_list = [repo.strip() for repo in REPOS.split(",")]
-
-    # Run scraper for the GitHub repositories
+    
+    scraper = RepoScraper(DB, GITHUB_TOKEN)
+    
+    scraper.repo_list = [repo.strip() for repo in REPO.split(",")]
+    
     scraper.run()
-
-    # Recommend domains based on the database
-    scraper.recommend_domains_from_db()

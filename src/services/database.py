@@ -1,11 +1,16 @@
-## IMPORTS ###########################################################################################################
-from dotenv import load_dotenv
+## LIBRARIES ###########################################################################################################
 import os
 import random
 import sqlite3
+## CLASS IMPORTS #####################################################################################################
 from sqlite3 import Error
+## FUNCTIONS #########################################################################################################
+from dotenv import load_dotenv
+## CONFIGURATION #######################################################################################################
 load_dotenv()
 DB = os.getenv("DATABASE")
+## TESTING ###########################################################################################################
+RUN_STYLE = 'INIT' # 'PROD'
 ## CLASSES ###########################################################################################################
 class DatabaseInitializer:
     def __init__(self, db_file):
@@ -97,12 +102,12 @@ class DatabaseInitializer:
         
         # # Domains
         domains_data = [
-            ("Technology", " content"),
-            ("API", " content"),
+            ("Sales", " content"),
             ("Product", " content"),
-            ("Finance", " content"),
-            ("Knowledge", " content"),
-            ("Operations", " content")
+            ("Operations", " content"),
+            # ("Finance", " content"),
+            # ("Knowledge", " content"),
+            # ("Operations", " content")
         ]
         
         # File objects (2-5 per repo)
@@ -161,6 +166,7 @@ class DatabaseInitializer:
             self.cursor.execute("DROP TABLE IF EXISTS domains")
             self.cursor.execute("DROP TABLE IF EXISTS fileObjects")
             self.cursor.execute("DROP TABLE IF EXISTS repos")
+            self.cursor.execute("DROP TABLE IF EXISTS content_domain_relationships")
             self.connection.commit()
             print("Database and all tables dropped successfully.")
         except Error as e:
@@ -171,24 +177,27 @@ class DatabaseInitializer:
         if self.connection:
             self.connection.close()
             print("Connection closed.")
-
-# Usage example
-
+## MAIN ##############################################################################################################
 if __name__ == "__main__":
-    # Initialize the DatabaseInitializer class
+    
+    from datetime import datetime
+    
+    print("Starting the main program.")
+    st = datetime.now()
+    duration = 0
+    
+    # Load environment variables
+    load_dotenv()
+    DATABASE = os.getenv("DATABASE")
     db_initializer = DatabaseInitializer(DB)
-
-    # Connect to the database
     connection, cursor = db_initializer.connect()
-
-    # Drop the database and all tables (optional)
-    # db_initializer.drop_db()
-
-    # Create tables in the database
+    
+    # Initialize Database
+    if RUN_STYLE == 'INIT':
+        db_initializer.drop_db()
     db_initializer.create_tables()
-
-    # Load test data into the database
-    # db_initializer.load_test_data()
-
-    # Close the database connection
     db_initializer.close()
+
+    et = datetime.now()
+    duration = et - st
+    print(f"Program completed in {duration} seconds.")

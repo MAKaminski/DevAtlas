@@ -2,9 +2,7 @@
 config/*
 .venv
 .env
-
 # Shell
 .zshrc
-
 # Database
 DevAtlas.db

@@ -1,11 +1,14 @@
+## IMPORTS ##############################################################################################################
+import os
 import sqlite3
-import plotly.graph_objects as go
 import networkx as nx
+import plotly.graph_objects as go
+## FUNCTIONS ############################################################################################################
 from dotenv import load_dotenv
-
+## CONFIGURATION ########################################################################################################
 load_dotenv()
 DB = os.getenv("DATABASE") 
-
+## CLASSES ############################################################################################################
 class InteractiveNetworkGraphVisualizer:
     def __init__(self, db_file):
         """Initialize the Database connection"""
@@ -171,9 +174,7 @@ class InteractiveNetworkGraphVisualizer:
         if self.connection:
             self.connection.close()
             print("Connection closed.")
-
-# Usage example
-
+## MAIN  ##############################################################################################################
 if __name__ == "__main__":
 
     visualizer = InteractiveNetworkGraphVisualizer(DB)

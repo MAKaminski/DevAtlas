@@ -1,15 +1,16 @@
-from openai import OpenAI
+## LIBRARIES ###########################################################################################################
 import sqlite3
+import openai
 import os
 import random
 import re
+## FUNCTIONS ############################################################################################################
 from dotenv import load_dotenv
-
-# Load environment variables
+## CONFIGURATION ########################################################################################################
 load_dotenv()
 DB = os.getenv("DATABASE")
-client = OpenAI(api_key=os.getenv("OPENAI_KEY"))
-
+openai.api_key = os.getenv("OPENAI_TOKEN")
+## CLASSES ############################################################################################################
 class GPTContentAnalyzer:
     def __init__(self, db_file):
         self.db_file = db_file
@@ -30,6 +31,7 @@ class GPTContentAnalyzer:
         if self.connection:
             self.connection.commit()
             self.connection.close()
+            print("Database connection closed.")
 
     def fetch_random_content(self):
         """Fetch a random content record from the database."""
@@ -85,8 +87,8 @@ class GPTContentAnalyzer:
         """Use OpenAI GPT to analyze the content."""
         prompt = self.create_prompt(content, domains)
         try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert content analyzer."},
                     {"role": "user", "content": prompt}
@@ -94,32 +96,75 @@ class GPTContentAnalyzer:
                 max_tokens=500,
                 temperature=0.7
             )
-            return response.choices[0].message.content
+            return response['choices'][0]['message']['content'].strip()
         except Exception as e:
             print(f"Error with OpenAI API: {e}")
             return None
 
-    def process_analysis_result(self, analysis_result, domains):
+    def process_analysis_result(self, content_id, analysis_result, domains):
         """Process the analysis result to determine relatedness and insert new domains."""
         print("Analysis Result:")
         print(analysis_result)
 
         relatedness = {}
+        summary_match = re.search(r"Summarize the content:\n(.+?)\n\n", analysis_result, re.DOTALL)
+        summary = summary_match.group(1).strip() if summary_match else ""
+
         for domain_id, domain_name in domains:
             match = re.search(fr"{domain_name}: ([0-9]+)%", analysis_result)
             if match:
-                relatedness[domain_name] = int(match.group(1))
+                relatedness[domain_id] = int(match.group(1))
 
         print("Relatedness percentages:")
-        for domain, percentage in relatedness.items():
-            print(f"{domain}: {percentage}%")
+        for domain_id, percentage in relatedness.items():
+            print(f"Domain {domain_id}: {percentage}%")
+
+        # Sort by relatedness and limit to top 3 domains with > 30% relatedness
+        top_related_domains = sorted(
+            [(domain_id, percentage) for domain_id, percentage in relatedness.items() if percentage > 30],
+            key=lambda x: x[1],
+            reverse=True
+        )[:3]
+
+        # Insert summary into the database
+        try:
+            self.cursor.execute(
+                "UPDATE content SET summary = ? WHERE id = ?",
+                (summary, content_id)
+            )
+            self.connection.commit()
+            print(f"Inserted summary for Content {content_id}.")
+        except sqlite3.Error as e:
+            print(f"Error inserting summary: {e}")
+
+        # Insert relationships into the database
+        for domain_id, percentage in top_related_domains:
+            try:
+                self.cursor.execute(
+                    "INSERT INTO content_domain_relationships (content_id, domain_id, relatedness_percentage) VALUES (?, ?, ?)",
+                    (content_id, domain_id, percentage)
+                )
+                self.connection.commit()
+                print(f"Inserted relationship: Content {content_id} -> Domain {domain_id} ({percentage}%)")
+            except sqlite3.Error as e:
+                print(f"Error inserting relationship: {e}")
 
         # Check for new domain recommendations
-        new_domain_match = re.search(r"suggest a new domain: (.+?)", analysis_result, re.IGNORECASE)
-        if new_domain_match:
-            new_domain = new_domain_match.group(1).strip()
+        new_domains = []
+        new_domain_match = re.findall(r"suggest a new domain: (.+?)", analysis_result, re.IGNORECASE)
+        for new_domain in new_domain_match:
+            new_domain = new_domain.strip()
             self.insert_new_domain(new_domain)
+            self.cursor.execute("SELECT id FROM domains WHERE name = ?", (new_domain,))
+            new_domain_id = self.cursor.fetchone()
+            if new_domain_id:
+                new_domains.append(new_domain_id[0])
 
+        # Return domain IDs for further processing
+        return [domain_id for domain_id, _ in top_related_domains] + new_domains
+
+
+## MAIN ##############################################################################################################
 if __name__ == "__main__":
 
     # Initialize the analyzer
@@ -149,7 +194,7 @@ if __name__ == "__main__":
 
             if analysis_result:
                 # Process the analysis result
-                analyzer.process_analysis_result(analysis_result, existing_domains)
+                analyzer.process_analysis_result(record_id, analysis_result, existing_domains)
         else:
             print("No content available to analyze.")
 

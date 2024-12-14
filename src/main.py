@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 ## CLASSES ############################################################################################################
-from services import database, repoScraper, gptController, networkVisualizer
+from services import contentAnalyzer, databaseController, repoScraper, networkVisualizer
 ## CONFIGUREATION #####################################################################################################
 RUN_STYLE = 'INIT' # 'PROD'
 ## FUNCTIONS ############################################################################################################
@@ -38,9 +38,9 @@ if __name__ == "__main__":
     OPENAPI_TOKEN = os.getenv("OPENAI_TOKEN")
     
     # Initialize Classes
-    Local_database = database.DatabaseInitializer(DATABASE)
+    Local_database = databaseController.DatabaseInitializer(DATABASE)
     Local_repoScraper = repoScraper.RepoScraper(DATABASE, GITHUB_TOKEN)
-    Local_gptController = gptController.GPTContentAnalyzer(DATABASE)
+    Local_gptController = contentAnalyzer.GPTContentAnalyzer(DATABASE)
     Local_networkVisualizer = networkVisualizer.InteractiveNetworkGraphVisualizer(DATABASE)
     
     # Initialize Database

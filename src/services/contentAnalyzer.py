@@ -1,6 +1,6 @@
 ## LIBRARIES ###########################################################################################################
 import sqlite3
-import openai
+from openai import OpenAI
 import os
 import random
 import re
@@ -9,14 +9,20 @@ from dotenv import load_dotenv
 ## CONFIGURATION ########################################################################################################
 load_dotenv()
 DB = os.getenv("DATABASE")
-openai.api_key = os.getenv("OPENAI_TOKEN")
+client = OpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+MAX_TOKENS = 500
 ## CLASSES ############################################################################################################
-class GPTContentAnalyzer:
-    def __init__(self, db_file):
+class ContentAnalyzer:
+    def __init__(self, db_file, connection):
         self.db_file = db_file
-        self.connection = None
-        self.cursor = None
-
+        if connection is not None:
+            self.connection = connection
+            self.cursor = self.connection.cursor()
+        else:
+            self.connection = None
+            self.cursor = None
+            self.connect_db()
+        
     def connect_db(self):
         """Connect to the SQLite database."""
         try:
@@ -25,6 +31,8 @@ class GPTContentAnalyzer:
             print("Connected to the database successfully.")
         except sqlite3.Error as e:
             print(f"Database connection error: {e}")
+            self.connection = None
+            self.cursor = None
 
     def close_db(self):
         """Close the SQLite database connection."""
@@ -35,6 +43,9 @@ class GPTContentAnalyzer:
 
     def fetch_random_content(self):
         """Fetch a random content record from the database."""
+        if not self.cursor:
+            print("Database cursor is not available.")
+            return None, None
         try:
             self.cursor.execute("SELECT id, description FROM content")
             rows = self.cursor.fetchall()
@@ -49,6 +60,9 @@ class GPTContentAnalyzer:
 
     def fetch_domains(self):
         """Fetch all domain names from the database."""
+        if not self.cursor:
+            print("Database cursor is not available.")
+            return []
         try:
             self.cursor.execute("SELECT id, name FROM domains")
             rows = self.cursor.fetchall()
@@ -59,6 +73,9 @@ class GPTContentAnalyzer:
 
     def insert_new_domain(self, domain_name):
         """Insert a new domain into the domains table."""
+        if not self.cursor:
+            print("Database cursor is not available.")
+            return
         try:
             self.cursor.execute("INSERT INTO domains (name) VALUES (?)", (domain_name,))
             self.connection.commit()
@@ -87,22 +104,25 @@ class GPTContentAnalyzer:
         """Use OpenAI GPT to analyze the content."""
         prompt = self.create_prompt(content, domains)
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are an expert content analyzer."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=MAX_TOKENS,
                 temperature=0.7
             )
-            return response['choices'][0]['message']['content'].strip()
+            return response.choices[0].message.content
         except Exception as e:
             print(f"Error with OpenAI API: {e}")
             return None
 
     def process_analysis_result(self, content_id, analysis_result, domains):
         """Process the analysis result to determine relatedness and insert new domains."""
+        if not self.cursor:
+            print("Database cursor is not available.")
+            return []
         print("Analysis Result:")
         print(analysis_result)
 
@@ -125,6 +145,8 @@ class GPTContentAnalyzer:
             key=lambda x: x[1],
             reverse=True
         )[:3]
+
+        return self.insert_summary_and_relationships(content_id, summary, top_related_domains, analysis_result)
 
         # Insert summary into the database
         try:
@@ -162,8 +184,6 @@ class GPTContentAnalyzer:
 
         # Return domain IDs for further processing
         return [domain_id for domain_id, _ in top_related_domains] + new_domains
-
-
 ## MAIN ##############################################################################################################
 if __name__ == "__main__":
 

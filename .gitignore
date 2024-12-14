@@ -1,8 +1,10 @@
 # Enviornment
-config/*
+.config
 .venv
 .env
 # Shell
 .zshrc
+.vscode
+.git/
 # Database
 DevAtlas.db

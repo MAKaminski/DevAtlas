@@ -6,7 +6,7 @@ import sqlite3
 from github import Github
 from github.GithubException import UnknownObjectException
 ## DEV_ATLAS CLASSES #####################################################################################################
-from gptController import GPTContentAnalyzer
+from services.contentAnalyzer import GPTContentAnalyzer
 ## FUNCTIONS ############################################################################################################
 from dotenv import load_dotenv
 ## CONFIGURATION ########################################################################################################
@@ -14,6 +14,7 @@ load_dotenv()
 DB = os.getenv("DATABASE")
 ## TESTING ##############################################################################################################
 RUN_STYLE = 'SINGLE' # 'MULTI'
+MAX_TOKENS = 500
 ## CLASSES ############################################################################################################
 class RepoScraper:
     IGNORE_REPOS = ["src/data/", "env/", ".env", ".venv"]  # List of files or directories to ignore
@@ -112,6 +113,8 @@ class RepoScraper:
     def scrape_directory(self, repo_id, contents, gitignore_patterns):
         """Recursively scrape a directory in the repository."""
         domains = self.fetch_domains()
+        analyzer = GPTContentAnalyzer(DB, self.connection)
+
         for content_file in contents:
             if self.should_ignore(content_file.path, gitignore_patterns):
                 print(f"Ignoring {content_file.path}")
@@ -135,12 +138,91 @@ class RepoScraper:
                     print(f"Failed to decode content for {content_file.name}: {e}")
                     file_content = ""
 
-                description = file_content[:10000]  # Truncate content to 10,000 characters
-                analysis_result = GPTContentAnalyzer(DB).analyze_content_with_gpt(description, domains)
-                if analysis_result:
-                    domain_ids = GPTContentAnalyzer(DB).process_analysis_result(file_id, analysis_result, domains)
-                    for domain_id in domain_ids:
-                        self.insert_content(file_id, description, domain_id)
+                # Split content into chunks for pagination
+                chunks = self.split_into_chunks(file_content, MAX_TOKENS)
+
+                for chunk in chunks:
+                    analysis_result = analyzer.analyze_content_with_gpt(chunk, domains)
+                    if analysis_result:
+                        # Process analysis result and insert summary and relationships
+                        self.process_analysis_result(file_id, chunk, analysis_result, domains)
+
+    def split_into_chunks(self, text, chunk_size):
+        """Split text into chunks of a specified size."""
+        return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+    def process_analysis_result(self, file_object_id, description, analysis_result, domains):
+        """Insert content and analysis results into the database."""
+        analyzer = GPTContentAnalyzer(DB, self.connection)
+
+        # Step 1: Insert the content record
+        try:
+            self.cursor.execute(
+                "INSERT INTO content (fileObject_id, description) VALUES (?, ?)",
+                (file_object_id, description)
+            )
+            self.connection.commit()
+            content_id = self.cursor.lastrowid
+            print(f"Inserted content: ID {content_id}, FileObject {file_object_id}")
+        except sqlite3.Error as e:
+            print(f"Error inserting content: {e}")
+            return []
+
+        # Step 2: Extract summary from analysis result
+        relatedness = {}
+        summary_match = re.search(r"Summarize the content:\n(.+?)\n\n", analysis_result, re.DOTALL)
+        summary = summary_match.group(1).strip() if summary_match else ""
+
+        # Step 3: Determine relatedness percentages
+        for domain_id, domain_name in domains:
+            match = re.search(fr"{domain_name}: ([0-9]+)%", analysis_result)
+            if match:
+                relatedness[domain_id] = int(match.group(1))
+
+        # Step 4: Sort and filter top related domains
+        top_related_domains = sorted(
+            [(domain_id, percentage) for domain_id, percentage in relatedness.items() if percentage > 30],
+            key=lambda x: x[1],
+            reverse=True
+        )[:3]
+
+        # Step 5: Update summary for the content record
+        try:
+            self.cursor.execute(
+                "UPDATE content SET summary = ? WHERE id = ?",
+                (summary, content_id)
+            )
+            self.connection.commit()
+            print(f"Inserted summary for Content {content_id}.")
+        except sqlite3.Error as e:
+            print(f"Error inserting summary: {e}")
+
+        # Step 6: Insert domain relationships
+        for domain_id, percentage in top_related_domains:
+            try:
+                self.cursor.execute(
+                    "INSERT INTO content_domain_relationships (content_id, domain_id, relatedness_percentage) VALUES (?, ?, ?)",
+                    (content_id, domain_id, percentage)
+                )
+                self.connection.commit()
+                print(f"Inserted relationship: Content {content_id} -> Domain {domain_id} ({percentage}%)")
+            except sqlite3.Error as e:
+                print(f"Error inserting relationship: {e}")
+
+        # Step 7: Handle new domain recommendations
+        new_domains = []
+        new_domain_match = re.findall(r"suggest a new domain: (.+?)", analysis_result, re.IGNORECASE)
+        for new_domain in new_domain_match:
+            new_domain = new_domain.strip()
+            analyzer.insert_new_domain(new_domain)
+            self.cursor.execute("SELECT id FROM domains WHERE name = ?", (new_domain,))
+            new_domain_id = self.cursor.fetchone()
+            if new_domain_id:
+                new_domains.append(new_domain_id[0])
+
+        # Step 8: Return the combined domain IDs
+        return [domain_id for domain_id, _ in top_related_domains] + new_domains
+
 
     def print_repo_results(self, repo_full_name):
         """Print the results of the repository scrape."""
